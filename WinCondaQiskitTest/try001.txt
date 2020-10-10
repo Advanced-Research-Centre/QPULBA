@@ -1,0 +1,7 @@
+# Install Anaconda 64-bit 
+# Open Anaconda Navigator
+# [optional] Login to Anaconda Cloud
+# Create new environment
+# "pip install qiskit" in terminal of the environment
+# Run python file from terminal of the environment
+print("Hello World")
