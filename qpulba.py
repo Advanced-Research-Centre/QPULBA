@@ -46,10 +46,68 @@ def save_isv(statevector, mode=1):
 
 #=====================================================================================================================
 
+def nCX(k,c,t,b):
+    nc = len(c)
+    if nc == 1:
+        k.cx(c[0], t[0])
+    elif nc == 2:
+        k.toffoli(c[0], c[1], t[0])
+    else:
+        nch = math.ceil(nc/2)
+        c1 = c[:nch]
+        c2 = c[nch:]
+        c2.append(b[0])
+        nCX(k,c1,b,[nch+1])
+        nCX(k,c2,t,[nch-1])
+        nCX(k,c1,b,[nch+1])
+        nCX(k,c2,t,[nch-1])
+    return
+
+#=====================================================================================================================
+
 def U_init(qcirc, circ_width, fsm):
 	for i in fsm:                  
 		qcirc.h(i)
 	return
+
+def U_read(qcirc, read, head, tape, ancilla):
+    # Reset read (prepz measures superposed states... need to uncompute)
+    for cell in range(0, len(tape)):
+        enc = format(cell, '#0'+str(len(head)+2)+'b')   # 2 for '0b' prefix
+        for i in range(2, len(enc)):
+            if(enc[i] == '0'):
+                qcirc.x(head[i-2])
+        qsdk.nCX(qcirc, head+[tape[cell]], read, [ancilla[0]])
+        for i in range(2, len(enc)):
+            if(enc[i] == '0'):
+                qcirc.x(head[i-2])
+    return
+
+def U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla):
+    qcirc.x(state[tick])                                             			# If s == 0
+    qcirc.x(read[0])                                                  				# If s == 0 && read == 0
+    qsdk.nCX(qcirc, [state[tick],fsm[0],read[0]], [state[tick+1]], [ancilla[0]])       # Update state
+    qsdk.nCX(qcirc, [state[tick],fsm[1],read[0]], write, [ancilla[0]])                 # Update write
+    qsdk.nCX(qcirc, [state[tick],fsm[2],read[0]], move, [ancilla[0]])                  # Update move
+    qcirc.x(read[0])                                                 				# If s == 0 && read == 1
+    qsdk.nCX(qcirc, [state[tick],fsm[3],read[0]], [state[tick+1]], [ancilla[0]])       # Update state
+    qsdk.nCX(qcirc, [state[tick],fsm[4],read[0]], write, [ancilla[0]])                 # Update write
+    qsdk.nCX(qcirc, [state[tick],fsm[5],read[0]], move, [ancilla[0]])                  # Update move
+    qcirc.x(state[tick])	                                             			# If s == 1 (no arrows)
+    return
+
+def U_write(qcirc, write, head, tape, ancilla):
+    # Reset write (prepz measures superposed states... need to uncompute)
+    for cell in range(0, len(tape)):
+        enc = format(cell, '#0'+str(len(head)+2)+'b')   # 2 for '0b' prefix
+        for i in range(2, len(enc)):
+            if(enc[i] == '0'):
+                qcirc.x(head[i-2])
+        qsdk.nCX(qcirc, head+write, [tape[cell]], [ancilla[0]])
+        for i in range(2, len(enc)):
+            if(enc[i] == '0'):
+                qcirc.x(head[i-2])
+    return
 
 def U_move(qcirc, move, head, ancilla, test):
 	# Increment/Decrement using Adder
@@ -98,6 +156,8 @@ def U_move(qcirc, move, head, ancilla, test):
 	qcirc.x(reg_a[0])	
 	
 	return
+
+#=====================================================================================================================
 
 def Test_move(qcirc, move, head, ancilla, test):
 	# Test using full superposition of head, both inc/dec and association to initial state
@@ -162,18 +222,18 @@ U_init(qcirc, qcirc_width, fsm)
 # 2. Run machine for n-iterations:
 for tick in range(0, sim_tick):
 
-	# 2.1  {read} << U_read({head, tape})
+	# 2.1	{read} << U_read({head, tape})
 	# U_read(k_read, read, head, tape, move)   # move qubits used as borrowed ancilla
 
-	# 2.2  {write, state, move} << U_fsm({read, state, fsm})
+	# 2.2	{write, state, move} << U_fsm({read, state, fsm})
 	# U_fsm(k_fsm, tick, fsm, state, read, write, move, ancilla)
 
-	# 2.3  {tape} << U_write({head, write})
+	# 2.3	{tape} << U_write({head, write})
 	# U_write(k_write, write, head, tape, ancilla)
 
-	# 2.4  {head, err} << U_move({head, move})
-	Test_move(qcirc, move, head, ancilla, test)
-	U_move(qcirc, move, head, ancilla, test)
+	# 2.4	{head, err} << U_move({head, move})
+	#		Test_move(qcirc, move, head, ancilla, test)
+	#		U_move(qcirc, move, head, ancilla, test)
 
 	# 2.5  UNCOMPUTE
 	# U_fsm_UC(k_fsm_uc, tick, fsm, state, read, write, move, ancilla)  # TBD: Generalize tick = 0, inside sim_tick loop
