@@ -4,10 +4,6 @@ from qiskit import QuantumCircuit, Aer, execute
 from math import log2, ceil, pi
 from numpy import savetxt, save, savez_compressed
 
-
-# a2 = np.pi * random.random()
-#import qsdk     # from qsdk import nCX
-
 #=====================================================================================================================
 
 simulator = Aer.get_backend('statevector_simulator')
@@ -53,7 +49,7 @@ def nCX(k,c,t,b):
     elif nc == 2:
         k.toffoli(c[0], c[1], t[0])
     else:
-        nch = math.ceil(nc/2)
+        nch = ceil(nc/2)
         c1 = c[:nch]
         c2 = c[nch:]
         c2.append(b[0])
@@ -71,29 +67,40 @@ def U_init(qcirc, circ_width, fsm):
 	return
 
 def U_read(qcirc, read, head, tape, ancilla):
-    # Reset read (prepz measures superposed states... need to uncompute)
-    for cell in range(0, len(tape)):
-        enc = format(cell, '#0'+str(len(head)+2)+'b')   # 2 for '0b' prefix
-        for i in range(2, len(enc)):
-            if(enc[i] == '0'):
-                qcirc.x(head[i-2])
-        qsdk.nCX(qcirc, head+[tape[cell]], read, [ancilla[0]])
-        for i in range(2, len(enc)):
-            if(enc[i] == '0'):
-                qcirc.x(head[i-2])
-    return
+	# Reset read (prepz measures superposed states... need to uncompute)
+	for cell in range(0, len(tape)):
+		enc = format(cell, '#0'+str(len(head)+2)+'b')   # 2 for '0b' prefix
+		for i in range(2, len(enc)):
+			if(enc[i] == '0'):
+				qcirc.x(head[(len(head)-1)-(i-2)])
+		nCX(qcirc, head+[tape[cell]], read, [ancilla[0]])
+		for i in range(2, len(enc)):
+			if(enc[i] == '0'):
+				qcirc.x(head[(len(head)-1)-(i-2)])
+		qcirc.barrier()
+	return
 
 def U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla):
+	# Description Number Encoding: {Q/M/W}{QR}
+	# [ Q11 M11 W11 Q10 M10 W10 Q01 M01 W01 Q00 M00 W00 ] LSQ = W00 = fsm[0]
     qcirc.x(state[tick])                                             			# If s == 0
     qcirc.x(read[0])                                                  				# If s == 0 && read == 0
-    qsdk.nCX(qcirc, [state[tick],fsm[0],read[0]], [state[tick+1]], [ancilla[0]])       # Update state
-    qsdk.nCX(qcirc, [state[tick],fsm[1],read[0]], write, [ancilla[0]])                 # Update write
-    qsdk.nCX(qcirc, [state[tick],fsm[2],read[0]], move, [ancilla[0]])                  # Update move
+    nCX(qcirc, [state[tick],fsm[0],read[0]], write, [ancilla[0]])                 		# Update write
+    nCX(qcirc, [state[tick],fsm[1],read[0]], move, [ancilla[0]])                  		# Update move
+    nCX(qcirc, [state[tick],fsm[2],read[0]], [state[tick+1]], [ancilla[0]])       		# Update state
     qcirc.x(read[0])                                                 				# If s == 0 && read == 1
-    qsdk.nCX(qcirc, [state[tick],fsm[3],read[0]], [state[tick+1]], [ancilla[0]])       # Update state
-    qsdk.nCX(qcirc, [state[tick],fsm[4],read[0]], write, [ancilla[0]])                 # Update write
-    qsdk.nCX(qcirc, [state[tick],fsm[5],read[0]], move, [ancilla[0]])                  # Update move
-    qcirc.x(state[tick])	                                             			# If s == 1 (no arrows)
+    nCX(qcirc, [state[tick],fsm[3],read[0]], write, [ancilla[0]])                 		# Update write
+    nCX(qcirc, [state[tick],fsm[4],read[0]], move, [ancilla[0]])                  		# Update move
+    nCX(qcirc, [state[tick],fsm[5],read[0]], [state[tick+1]], [ancilla[0]])       		# Update state
+    qcirc.x(state[tick])	                                             		# If s == 1
+    qcirc.x(read[0])                                                  				# If s == 1 && read == 0
+    nCX(qcirc, [state[tick],fsm[6],read[0]], write, [ancilla[0]])                 		# Update write
+    nCX(qcirc, [state[tick],fsm[7],read[0]], move, [ancilla[0]])                  		# Update move
+    nCX(qcirc, [state[tick],fsm[8],read[0]], [state[tick+1]], [ancilla[0]])       		# Update state
+    qcirc.x(read[0])                                                 				# If s == 1 && read == 1
+    nCX(qcirc, [state[tick],fsm[9],read[0]], write, [ancilla[0]])                 		# Update write
+    nCX(qcirc, [state[tick],fsm[10],read[0]], move, [ancilla[0]])                  		# Update move
+    nCX(qcirc, [state[tick],fsm[11],read[0]], [state[tick+1]], [ancilla[0]])       		# Update state
     return
 
 def U_write(qcirc, write, head, tape, ancilla):
@@ -102,14 +109,14 @@ def U_write(qcirc, write, head, tape, ancilla):
         enc = format(cell, '#0'+str(len(head)+2)+'b')   # 2 for '0b' prefix
         for i in range(2, len(enc)):
             if(enc[i] == '0'):
-                qcirc.x(head[i-2])
-        qsdk.nCX(qcirc, head+write, [tape[cell]], [ancilla[0]])
+                qcirc.x(head[(len(head)-1)-(i-2)])
+        nCX(qcirc, head+write, [tape[cell]], [ancilla[0]])
         for i in range(2, len(enc)):
             if(enc[i] == '0'):
-                qcirc.x(head[i-2])
+                qcirc.x(head[(len(head)-1)-(i-2)])
     return
 
-def U_move(qcirc, move, head, ancilla, test):
+def U_move(qcirc, move, head, ancilla):
 	# Increment/Decrement using Adder
 
 	reg_a = move
@@ -157,14 +164,149 @@ def U_move(qcirc, move, head, ancilla, test):
 	
 	return
 
+def U_rst(qcirc, tick, fsm, state, read, write, move, ancilla):
+	# Reset write and move
+	qcirc.x(state[tick])                                           
+	qcirc.x(read[0])   
+	nCX(qcirc, [state[tick],fsm[0],read[0]], write, [ancilla[0]])      
+	nCX(qcirc, [state[tick],fsm[1],read[0]], move, [ancilla[0]])  
+	qcirc.x(read[0])                                         
+	nCX(qcirc, [state[tick],fsm[3],read[0]], write, [ancilla[0]])     
+	nCX(qcirc, [state[tick],fsm[4],read[0]], move, [ancilla[0]])    
+	qcirc.x(state[tick])                                        
+	qcirc.x(read[0])                                                 
+	nCX(qcirc, [state[tick],fsm[6],read[0]], write, [ancilla[0]])      
+	nCX(qcirc, [state[tick],fsm[7],read[0]], move, [ancilla[0]])  
+	qcirc.x(read[0])                                         
+	nCX(qcirc, [state[tick],fsm[9],read[0]], write, [ancilla[0]])     
+	nCX(qcirc, [state[tick],fsm[10],read[0]], move, [ancilla[0]])    
+	# Maintain computation history
+	qcirc.swap(state[0],state[tick+1])
+	return
+
 #=====================================================================================================================
 
+def Test_cfg(block):
+	global fsm, state, move, head, read, write, tape, ancilla, test
+	if (block == 'none'):
+		return
+	elif (block == 'read'):
+		fsm     = []
+		state   = []
+		move    = []
+		head    = [0,1,2,3]
+		read    = [4]
+		write   = []
+		tape    = [5,6,7,8,9,10,11,12,13,14,15,16]
+		ancilla = [17]
+		test 	= [18]
+	elif (block == 'fsm'):
+		fsm     = [0,1,2,3,4,5,6,7,8,9,10,11]
+		state   = [12,13]
+		move    = [14]
+		head    = []
+		read    = [15]
+		write   = [16]
+		tape    = []
+		ancilla = [17]
+		test 	= [18,19,20]
+	elif (block == 'move'):
+		fsm     = []
+		state   = []
+		move    = [0]
+		head    = [1,2,3,4]
+		read    = []
+		write   = []
+		tape    = []
+		ancilla = [5,6,7]
+		test 	= [8,9,10,11]
+	elif (block == 'write'):
+		fsm     = []
+		state   = []
+		move    = []
+		head    = [0,1,2,3]
+		read    = []
+		write   = [4]
+		tape    = [5,6,7,8,9,10,11,12,13,14,15,16]
+		ancilla = [17]
+		test 	= []#[18,19,20,21,22,23,24,25,26,27,28,29]
+	elif (block == 'rst'):
+		fsm     = [0,1,2,3,4,5,6,7,8,9,10,11]
+		state   = [12,13]
+		move    = [14]
+		head    = []
+		read    = [15]
+		write   = [16]
+		tape    = []
+		ancilla = [17]
+		test 	= [18,19,20,21]
+	print("\n\nTEST CONFIGURATION\n\tFSM\t:",fsm,"\n\tSTATE\t:",state,"\n\tMOVE\t:",move,"\n\tHEAD\t:",head,"\n\tREAD\t:",read,"\n\tWRITE\t:",write,"\n\tTAPE\t:",tape,"\n\tANCILLA :",ancilla,"\n\tTEST\t:",test)
+
+def Test_read(qcirc, read, head, tape, ancilla, test):
+	# Test using full superposition of head and some random tape qubits
+	# Test associated to read
+	for i in range(0,len(head)):
+		qcirc.h(head[i])
+	# Create random binary string of length tape 
+	randbin = ""
+	for i in range(len(tape)): randbin += str(random.randint(0, 1)) 
+	for i in range(0,len(tape)):
+		if (randbin[i] == '1'):
+			qcirc.h(tape[i])	# Replace H with X for ease
+	qcirc.cx(read[0],test[0])
+	print("Test tape:",randbin) 
+	qcirc.barrier()
+	return
+
+def Test_fsm(qcirc, tick, fsm, state, read, write, move, ancilla, test):
+	# Test using full superposition of fsm, current state, read
+	# Test associated to move, write, new state
+	# fsm superposition part of U_init
+	qcirc.barrier()
+	qcirc.h(state[0])
+	qcirc.h(read[0])
+	qcirc.barrier()
+	qcirc.cx(write[0],test[0])
+	qcirc.cx(move[0],test[1])
+	qcirc.cx(state[1],test[2])
+	qcirc.barrier()
+	return
+
+def Test_write(qcirc, write, head, tape, ancilla, test):
+	# Test using full superposition of head and write
+	# Test associated to tape (optional)
+	for i in range(0,len(head)):
+		qcirc.h(head[i])
+	qcirc.h(write)
+	# for i in range(0,len(tape)):
+	# 	qcirc.cx(tape[i],test[i])
+	return
+
 def Test_move(qcirc, move, head, ancilla, test):
-	# Test using full superposition of head, both inc/dec and association to initial state
+	# Test using full superposition of head, both inc/dec
+	# Test associated to head
 	for i in range(0,len(head)):
 		qcirc.h(head[i])
 		qcirc.cx(head[i],test[i]) 
 	qcirc.h(move[0])
+	qcirc.barrier()
+	return
+
+def Test_rst(qcirc, tick, fsm, state, read, write, move, ancilla, test):
+	# Test using full superposition of fsm, current state, read
+	# Test associated to move, write, new state
+	# fsm superposition part of U_init
+	for i in range(0,len(state)):
+		qcirc.h(state[i])
+	qcirc.h(read[0])
+	qcirc.h(write[0])
+	qcirc.h(move[0])
+	qcirc.barrier()
+	for i in range(0,len(state)):
+		qcirc.cx(state[i],test[i])
+	qcirc.cx(write[0],test[len(state)])
+	qcirc.cx(move[0],test[len(state)+1])
+	qcirc.barrier()
 	return
 
 #=====================================================================================================================
@@ -179,17 +321,18 @@ transitions = ssz * asz                         # Number of transition arrows in
 dsz = transitions * (tdim + csz + senc)         # Description size
 
 machines = 2 ** dsz
-print("\nNumber of "+str(asz)+"-symbol "+str(ssz)+"-state"+str(tdim)+"-dimension Quantum Parallel Universal Linear Bounded Automata: "+str(machines))
+print("\nNumber of "+str(asz)+"-symbol "+str(ssz)+"-state "+str(tdim)+"-dimension Quantum Parallel Universal Linear Bounded Automata: "+str(machines))
 
 tsz = dsz                                       # Turing Tape size (same as dsz to estimating self-replication and algorithmic probability)
 hsz = ceil(log2(tsz))                           # Head size
 
 sim_tick = tsz                                  # Number of ticks of the FSM before abort
+sim_tick = 1                                  	# Just 1 QPULBA cycle for proof-of-concept
 tlog = (sim_tick+1) * senc                      # Transition log # required?
-nanc	= 1
+nanc	= 3
 
 fsm     = list(range(   0,              dsz                         ))
-state   = list(range(   fsm     [-1]+1, fsm     [-1]+1+     senc    ))  # States (Binary coded) # tlog?
+state   = list(range(   fsm     [-1]+1, fsm     [-1]+1+     tlog    ))  # States (Binary coded)
 move    = list(range(   state   [-1]+1, state   [-1]+1+     tdim    ))
 head    = list(range(   move    [-1]+1, move    [-1]+1+     hsz     ))  # Binary coded, 0-MSB 2-LSB, [001] refers to Tape pos 1, not 4
 read    = list(range(   head    [-1]+1, head    [-1]+1+     csz     ))
@@ -198,22 +341,13 @@ tape    = list(range(   write   [-1]+1, write   [-1]+1+     tsz     ))
 ancilla = list(range(   tape    [-1]+1, tape    [-1]+1+     nanc    ))
 print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla)
 
-# Test configuration
-fsm     = []
-state   = []
-move    = [0]
-head    = [1,2,3,4]
-read    = []
-write   = []
-tape    = []
-ancilla = [5,6,7]
-test 	= [8,9,10,11]
-print("\n\nTEST CONFIGURATION\n\tFSM\t:",fsm,"\n\tSTATE\t:",state,"\n\tMOVE\t:",move,"\n\tHEAD\t:",head,"\n\tREAD\t:",read,"\n\tWRITE\t:",write,"\n\tTAPE\t:",tape,"\n\tANCILLA :",ancilla,"\n\tTEST\t:",test)
-
-qcirc_width = len(fsm) + len(state) + len(move) + len(head) + len(read) + len(write) + len(tape) + len(ancilla) + len(test)
-
 #=====================================================================================================================
 
+test 	= []
+unit	= 'none'	# 'read', 'fsm', 'write', 'move', 'rst'
+Test_cfg(unit)
+
+qcirc_width = len(fsm) + len(state) + len(move) + len(head) + len(read) + len(write) + len(tape) + len(ancilla) + len(test)
 qcirc = QuantumCircuit(qcirc_width)
 
 # 1. Initialize
@@ -221,26 +355,29 @@ U_init(qcirc, qcirc_width, fsm)
 
 # 2. Run machine for n-iterations:
 for tick in range(0, sim_tick):
-
+	
 	# 2.1	{read} << U_read({head, tape})
-	# U_read(k_read, read, head, tape, move)   # move qubits used as borrowed ancilla
+	if (unit == 'read'): Test_read(qcirc, read, head, tape, ancilla, test)
+	U_read(qcirc, read, head, tape, ancilla)
 
 	# 2.2	{write, state, move} << U_fsm({read, state, fsm})
-	# U_fsm(k_fsm, tick, fsm, state, read, write, move, ancilla)
-
+	if (unit == 'fsm'): Test_fsm(qcirc, tick, fsm, state, read, write, move, ancilla, test)
+	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
+	
 	# 2.3	{tape} << U_write({head, write})
-	# U_write(k_write, write, head, tape, ancilla)
+	if (unit == 'write'): Test_write(qcirc, write, head, tape, ancilla, test)
+	U_write(qcirc, write, head, tape, ancilla)
 
 	# 2.4	{head, err} << U_move({head, move})
-	#		Test_move(qcirc, move, head, ancilla, test)
-	#		U_move(qcirc, move, head, ancilla, test)
+	if (unit == 'move'): Test_move(qcirc, move, head, ancilla, test)
+	U_move(qcirc, move, head, ancilla)
 
-	# 2.5  UNCOMPUTE
-	# U_fsm_UC(k_fsm_uc, tick, fsm, state, read, write, move, ancilla)  # TBD: Generalize tick = 0, inside sim_tick loop
+	# 2.5  	reset
+	if (unit == 'rst'): Test_rst(qcirc, tick, fsm, state, read, write, move, ancilla, test)
+	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
 
-	break
-
+print()
 print(qcirc.draw())
-disp_isv(qcirc, "Step: Test move", all=False, precision=1e-4)
+# disp_isv(qcirc, "Step: Test all", all=False, precision=1e-4) # Full simulation doesn't work
 
 #=====================================================================================================================
