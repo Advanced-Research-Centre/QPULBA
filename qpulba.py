@@ -377,7 +377,8 @@ for tick in range(0, sim_tick):
 	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
 
 print()
-print(qcirc.draw())
+#print(qcirc.draw())
+print(qcirc.qasm())
 # disp_isv(qcirc, "Step: Test all", all=False, precision=1e-4) # Full simulation doesn't work
 
 #=====================================================================================================================
