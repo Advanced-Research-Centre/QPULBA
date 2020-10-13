@@ -119,10 +119,10 @@ def U_write(qcirc, write, head, tape, ancilla):
 def U_move(qcirc, move, head, ancilla):
 	# Increment/Decrement using Adder
 
-	reg_a = move
+	reg_a = move.copy()
 	reg_a.extend([-1]*(len(head)-len(move)))
 
-	reg_b = head
+	reg_b = head.copy()
 
 	reg_c = [-1]        # No initial carry
 	reg_c.extend(ancilla)
@@ -150,6 +150,8 @@ def U_move(qcirc, move, head, ancilla):
 	for i in range(len(head)-2,-1,-1):
 		q_rcarry(qcirc,reg_c[i],reg_a[i],reg_b[i],reg_c[i+1])
 		q_sum(qcirc,reg_c[i],reg_a[i],reg_b[i])
+	
+	qcirc.barrier(move, head, ancilla)
 
 	qcirc.x(reg_a[0])
 	# Quantum Subtractor
@@ -162,6 +164,7 @@ def U_move(qcirc, move, head, ancilla):
 		q_rcarry(qcirc,reg_c[i],reg_a[i],reg_b[i],reg_c[i+1])
 	qcirc.x(reg_a[0])	
 	
+	qcirc.barrier()
 	return
 
 def U_rst(qcirc, tick, fsm, state, read, write, move, ancilla):
@@ -286,9 +289,9 @@ def Test_move(qcirc, move, head, ancilla, test):
 	# Test using full superposition of head, both inc/dec
 	# Test associated to head
 	for i in range(0,len(head)):
-		qcirc.h(head[i])
+		qcirc.ry(round(np.pi * random.random(),2),head[i])
 		qcirc.cx(head[i],test[i]) 
-	qcirc.h(move[0])
+	qcirc.ry(round(np.pi * random.random(),2),move[0])
 	qcirc.barrier()
 	return
 
@@ -311,8 +314,8 @@ def Test_rst(qcirc, tick, fsm, state, read, write, move, ancilla, test):
 
 #=====================================================================================================================
 
-asz = 2                                         # Alphabet size: Binary (0 is blank/default)
 ssz = 2                                         # State size (Initial state is all 0)
+asz = 2                                         # Alphabet size: Binary (0 is blank/default)
 tdim = 1                                        # Tape dimension
 
 csz = ceil(log2(asz))                           # Character symbol size
@@ -321,7 +324,7 @@ transitions = ssz * asz                         # Number of transition arrows in
 dsz = transitions * (tdim + csz + senc)         # Description size
 
 machines = 2 ** dsz
-print("\nNumber of "+str(asz)+"-symbol "+str(ssz)+"-state "+str(tdim)+"-dimension Quantum Parallel Universal Linear Bounded Automata: "+str(machines))
+print("\nNumber of "+str(ssz)+"-state "+str(asz)+"-symbol "+str(tdim)+"-dimension Quantum Parallel Universal Linear Bounded Automata: "+str(machines))
 
 tsz = dsz                                       # Turing Tape size (same as dsz to estimating self-replication and algorithmic probability)
 hsz = ceil(log2(tsz))                           # Head size
@@ -331,24 +334,28 @@ sim_tick = 1                                  	# Just 1 QPULBA cycle for proof-o
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-fsm     = list(range(   0,              dsz                         ))
-state   = list(range(   fsm     [-1]+1, fsm     [-1]+1+     tlog    ))  # States (Binary coded)
-move    = list(range(   state   [-1]+1, state   [-1]+1+     tdim    ))
-head    = list(range(   move    [-1]+1, move    [-1]+1+     hsz     ))  # Binary coded, 0-MSB 2-LSB, [001] refers to Tape pos 1, not 4
-read    = list(range(   head    [-1]+1, head    [-1]+1+     csz     ))
-write   = list(range(   read    [-1]+1, read    [-1]+1+     csz     ))  # Can be MUXed with read?
-tape    = list(range(   write   [-1]+1, write   [-1]+1+     tsz     ))
-ancilla = list(range(   tape    [-1]+1, tape    [-1]+1+     nanc    ))
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc]
+
+fsm     = list(range(sum(qnos[0:0]),sum(qnos[0:1])))
+state   = list(range(sum(qnos[0:1]),sum(qnos[0:2])))  # States (Binary coded)
+move    = list(range(sum(qnos[0:2]),sum(qnos[0:3])))
+head    = list(range(sum(qnos[0:3]),sum(qnos[0:4])))  # Binary coded, 0-MSB 2-LSB, [001] refers to Tape pos 1, not 4
+read    = list(range(sum(qnos[0:4]),sum(qnos[0:5])))
+write   = list(range(sum(qnos[0:5]),sum(qnos[0:6])))  # Can be MUXed with read?
+tape    = list(range(sum(qnos[0:6]),sum(qnos[0:7])))
+ancilla = list(range(sum(qnos[0:7]),sum(qnos[0:8])))
+
 print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla)
 
 #=====================================================================================================================
 
 test 	= []
-unit	= 'none'	# 'read', 'fsm', 'write', 'move', 'rst'
+unit	= 'all'	# 'all', read', 'fsm', 'write', 'move', 'rst'
 Test_cfg(unit)
 
 qcirc_width = len(fsm) + len(state) + len(move) + len(head) + len(read) + len(write) + len(tape) + len(ancilla) + len(test)
 qcirc = QuantumCircuit(qcirc_width)
+qcirc.barrier()
 
 # 1. Initialize
 U_init(qcirc, qcirc_width, fsm)
@@ -358,27 +365,27 @@ for tick in range(0, sim_tick):
 	
 	# 2.1	{read} << U_read({head, tape})
 	if (unit == 'read'): Test_read(qcirc, read, head, tape, ancilla, test)
-	U_read(qcirc, read, head, tape, ancilla)
+	if (unit == 'read' or unit == 'all'): U_read(qcirc, read, head, tape, ancilla)
 
 	# 2.2	{write, state, move} << U_fsm({read, state, fsm})
 	if (unit == 'fsm'): Test_fsm(qcirc, tick, fsm, state, read, write, move, ancilla, test)
-	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
+	if (unit == 'fsm' or unit == 'all'): U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
 	
 	# 2.3	{tape} << U_write({head, write})
 	if (unit == 'write'): Test_write(qcirc, write, head, tape, ancilla, test)
-	U_write(qcirc, write, head, tape, ancilla)
+	if (unit == 'write' or unit == 'all'): U_write(qcirc, write, head, tape, ancilla)
 
 	# 2.4	{head, err} << U_move({head, move})
 	if (unit == 'move'): Test_move(qcirc, move, head, ancilla, test)
-	U_move(qcirc, move, head, ancilla)
+	if (unit == 'move' or unit == 'all'): U_move(qcirc, move, head, ancilla)
 
 	# 2.5  	reset
 	if (unit == 'rst'): Test_rst(qcirc, tick, fsm, state, read, write, move, ancilla, test)
-	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
+	if (unit == 'rst' or unit == 'all'): U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
 
 print()
-#print(qcirc.draw())
-print(qcirc.qasm())
-# disp_isv(qcirc, "Step: Test all", all=False, precision=1e-4) # Full simulation doesn't work
+print(qcirc.draw())
+#print(qcirc.qasm())
+#disp_isv(qcirc, "Step: Test "+unit, all=False, precision=1e-4) # Full simulation doesn't work
 
 #=====================================================================================================================
