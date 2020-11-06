@@ -328,6 +328,14 @@ def condition_state(qcirc, state, target_state):
 
 #=====================================================================================================================
 
+search = tape
+condition_fsm(qcirc, fsm, tape)
+
+# print()
+# disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
+
+#=====================================================================================================================
+
 def U_oracle(sz):
 	# Mark fsm/tape/state with all zero Hamming distance (matches applied condition perfectly)
 	tgt_reg = list(range(0,sz))
@@ -340,21 +348,21 @@ def U_oracle(sz):
 	return oracle
 
 def U_diffuser(sz):
-	# Amplitude amplification on all qubits except count
-	tgt_reg = list(range(0,sz))
-	diffuser = QuantumCircuit(len(tgt_reg))
-	diffuser.h(tgt_reg)
-	diffuser.x(tgt_reg)
-	diffuser.h(tgt_reg[0])
-	diffuser.mct(tgt_reg[1:],tgt_reg[0])
-	diffuser.h(tgt_reg[0])
-	diffuser.x(tgt_reg)
-	diffuser.h(tgt_reg)
-	return diffuser
+    # https://qiskit.org/textbook/ch-algorithms/quantum-counting.html
+    tgt_reg = list(range(0,sz))
+    diffuser = QuantumCircuit(len(tgt_reg))
+    diffuser.h(tgt_reg[1:])
+    diffuser.x(tgt_reg[1:])
+    diffuser.z(tgt_reg[0])
+    diffuser.mct(tgt_reg[1:],tgt_reg[0])
+    diffuser.x(tgt_reg[1:])
+    diffuser.h(tgt_reg[1:])
+    diffuser.z(tgt_reg[0])
+    return diffuser
 
 def U_QFT(n):
     # n-qubit QFT circuit
-    qft = QuantumCircuit(4)
+    qft = QuantumCircuit(n)
     def swap_registers(qft, n):
         for qubit in range(n//2):
             qft.swap(qubit, n-qubit-1)
@@ -372,18 +380,7 @@ def U_QFT(n):
     swap_registers(qft, n)
     return qft
 
-
 #=====================================================================================================================
-
-# https://qiskit.org/textbook/ch-algorithms/quantum-counting.html
-
-search = tape
-condition_fsm(qcirc, fsm, tape)
-# print()
-# disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
-
-qcirc.h(count)
-qcirc.barrier()
 
 # Create controlled Grover oracle circuit
 oracle = U_oracle(len(search)).to_gate()
@@ -391,10 +388,11 @@ c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
 # Create controlled Grover diffuser circuit
+# diffuser = U_diffuser(len(search)).to_gate()
 diffuser = U_diffuser(sum(qnos[0:8])).to_gate()
-tgt_GD = fsm+tape
-tgt_GD.append(ancilla[1])
-# diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
+# tgt_GD = fsm+tape
+# tgt_GD.append(ancilla[1])
+# # diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
 
@@ -402,21 +400,24 @@ c_diffuser.label = "cGD"
 iqft = U_QFT(len(count)).to_gate().inverse()
 iqft.label = "iQFT"
 
+#=====================================================================================================================
+
+qcirc.h(count)
+qcirc.barrier()
+
 # Begin controlled Grover iterations
 iterations = 1
 for qb in count:
     for i in range(iterations):
-        # print([qb] + search)
         qcirc.append(c_oracle, [qb] + search)
-        qcirc.barrier()
         # qcirc.append(c_diffuser, [qb] + tgt_GD)
-        # qcirc.barrier()
         qcirc.append(c_diffuser, [qb] + list(range(0,sum(qnos[0:8]))))
-        qcirc.barrier()
     iterations *= 2
+    qcirc.barrier()
 
 # Inverse QFT
 qcirc.append(iqft, count)
+qcirc.barrier()
 
 # print()
 # disp_isv(qcirc, "Step: Search and count", all=False, precision=1e-4)
@@ -424,30 +425,19 @@ qcirc.append(iqft, count)
 # Measure counting qubits
 qcirc.measure(count, range(len(count)))
 
-emulator = Aer.get_backend('qasm_simulator')
-job = execute(qcirc, emulator, shots=2048 )
-hist = job.result().get_counts()
-measured_str = max(hist, key=hist.get)
-measured_int = int(measured_str,2)
-print("Register Output = %i" % measured_int)
-
-"""For Processing Output of Quantum Counting"""
-# Calculate Theta
-n = 4
-t = 4
-theta = (measured_int/(2**t))*pi*2
-print("Theta = %.5f" % theta)
-# Calculate No. of Solutions
-N = 2**n
-M = N * (sin(theta/2)**2)
-print("No. of Solutions = %.1f" % (N-M))
-
-print(hist)
-
 # print()
 # print(qcirc.draw())
-# print()
-# print(qcirc.qasm())
 
+#=====================================================================================================================
+
+emulator = Aer.get_backend('qasm_simulator')
+job = execute(qcirc, emulator, shots=1024)
+hist = job.result().get_counts()
+print(hist)
+
+measured_int = int(max(hist, key=hist.get),2)
+theta = (measured_int/(2**len(count)))*pi*2
+counter = 2**len(search) * (1 - sin(theta/2)**2)
+print("Number of solutions = %.1f" % counter)
 		
 #=====================================================================================================================
