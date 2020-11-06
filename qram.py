@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from qiskit import QuantumCircuit, Aer, execute
-from math import log2, ceil, pi
+from math import log2, ceil, pi, sin
 from numpy import savetxt, save, savez_compressed
 
 #=====================================================================================================================
@@ -175,6 +175,82 @@ def U_rst(qcirc, tick, fsm, state, read, write, move, ancilla):
 
 #=====================================================================================================================
 
+def Test_cfg_121(block):	# convert config from 221 to 121
+	global fsm, state, move, head, read, write, tape, ancilla, test
+	if (block == 'none'):
+		return
+	elif (block == 'read'):
+		fsm     = []
+		state   = []
+		move    = []
+		head    = [0,1,2,3]
+		read    = [4]
+		write   = []
+		tape    = [5,6,7,8,9,10,11,12,13,14,15,16]
+		ancilla = [17]
+		test 	= [18]
+	elif (block == 'fsm'):
+		fsm     = [0,1,2,3,4,5,6,7,8,9,10,11]
+		state   = [12,13]
+		move    = [14]
+		head    = []
+		read    = [15]
+		write   = [16]
+		tape    = []
+		ancilla = [17]
+		test 	= [18,19,20]
+	elif (block == 'move'):
+		fsm     = []
+		state   = []
+		move    = [0]
+		head    = [1,2,3,4]
+		read    = []
+		write   = []
+		tape    = []
+		ancilla = [5,6,7]
+		test 	= [8,9,10,11]
+	elif (block == 'write'):
+		fsm     = []
+		state   = []
+		move    = []
+		head    = [0,1,2,3]
+		read    = []
+		write   = [4]
+		tape    = [5,6,7,8,9,10,11,12,13,14,15,16]
+		ancilla = [17]
+		test 	= []#[18,19,20,21,22,23,24,25,26,27,28,29]
+	elif (block == 'rst'):
+		fsm     = [0,1,2,3,4,5,6,7,8,9,10,11]
+		state   = [12,13]
+		move    = [14]
+		head    = []
+		read    = [15]
+		write   = [16]
+		tape    = []
+		ancilla = [17]
+		test 	= [18,19,20,21]
+	elif (block == 'count'):
+		fsm     = [0,1,2,3]
+		state   = []
+		move    = []
+		head    = []
+		read    = []
+		write   = []
+		tape    = []
+		ancilla = []
+		test 	= []
+		count	= [4,5,6,7]
+		search 	= [8,9,10,11]
+	print("\n\nTEST CONFIGURATION\n\tFSM\t:",fsm,"\n\tSTATE\t:",state,"\n\tMOVE\t:",move,"\n\tHEAD\t:",head,"\n\tREAD\t:",read,"\n\tWRITE\t:",write,"\n\tTAPE\t:",tape,"\n\tANCILLA :",ancilla,"\n\tTEST\t:",test,"\n\tCOUNT\t:",count,"\n\tSEARCH\t:",search)
+
+def Test_count(qcirc, fsm):
+	# Test using some superposition of fsm and then Hamming distance
+	qcirc.barrier()
+	qcirc.barrier()
+	return
+
+#=====================================================================================================================
+
 asz = 2                                         # Alphabet size: Binary (0 is blank/default)
 ssz = 1                                         # State size (Initial state is all 0)
 tdim = 1                                        # Tape dimension
@@ -195,7 +271,7 @@ sim_tick = tsz                                  # Number of ticks of the FSM bef
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc]
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, dsz]
 
 fsm     = list(range(sum(qnos[0:0]),sum(qnos[0:1])))
 state   = list(range(sum(qnos[0:1]),sum(qnos[0:2])))  # States (Binary coded)
@@ -206,41 +282,172 @@ write   = list(range(sum(qnos[0:5]),sum(qnos[0:6])))  # Can be MUXed with read?
 tape    = list(range(sum(qnos[0:6]),sum(qnos[0:7])))
 ancilla = list(range(sum(qnos[0:7]),sum(qnos[0:8])))
 
-# print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla)
+count	= list(range(sum(qnos[0:8]),sum(qnos[0:9])))
+# search	= list(range(sum(qnos[0:9]),sum(qnos[0:10])))
+
+print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla,"\nCOUNT\t:",count)
+
 
 #=====================================================================================================================
 
 test 	= []
-unit	= 'none'
+unit	= 'none'	# 'none', 'read', 'fsm', 'write', 'move', 'rst', 'count'
 
-qcirc_width = sum(qnos[0:8]) + len(test)
-qcirc = QuantumCircuit(qcirc_width)
+qcirc_width = sum(qnos[0:9]) + len(test)
+qcirc = QuantumCircuit(qcirc_width, len(count))
 
 U_init(qcirc, qcirc_width, fsm)
-# for tick in range(0, sim_tick):
-# 	U_read(qcirc, read, head, tape, ancilla)
-# 	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
-# 	U_write(qcirc, write, head, tape, ancilla)
-# 	U_move(qcirc, move, head, ancilla)
-# 	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
+for tick in range(0, sim_tick):
+	U_read(qcirc, read, head, tape, ancilla)
+	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
+	U_write(qcirc, write, head, tape, ancilla)
+	U_move(qcirc, move, head, ancilla)
+	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
+
+# print()
+# disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
+
+#=====================================================================================================================
+
+def condition_fsm(qcirc, fsm, tape):
+	# Finding specific programs-output characteristics			(fsm|tape)
+	# e.g. Self-replication
+	for q in fsm:
+		qcirc.cx(q,tape[q])
+	qcirc.barrier()
+	return
+
+def condition_tape(qcirc, tape, target_tape):
+	# Finding algorithmic probability of a specific output		(tape|tape*)
+	return
+
+def condition_state(qcirc, state, target_state):
+	# Finding programs with specific end state					(state|state*)
+	# Note: not possible in QPULBA 121
+	return
+
+#=====================================================================================================================
+
+def U_oracle(sz):
+	# Mark fsm/tape/state with all zero Hamming distance (matches applied condition perfectly)
+	tgt_reg = list(range(0,sz))
+	oracle = QuantumCircuit(len(tgt_reg))
+	oracle.x(tgt_reg)
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x(tgt_reg)
+	return oracle
+
+def U_diffuser(sz):
+	# Amplitude amplification on all qubits except count
+	tgt_reg = list(range(0,sz))
+	diffuser = QuantumCircuit(len(tgt_reg))
+	diffuser.h(tgt_reg)
+	diffuser.x(tgt_reg)
+	diffuser.h(tgt_reg[0])
+	diffuser.mct(tgt_reg[1:],tgt_reg[0])
+	diffuser.h(tgt_reg[0])
+	diffuser.x(tgt_reg)
+	diffuser.h(tgt_reg)
+	return diffuser
+
+def U_QFT(n):
+    # n-qubit QFT circuit
+    qft = QuantumCircuit(4)
+    def swap_registers(qft, n):
+        for qubit in range(n//2):
+            qft.swap(qubit, n-qubit-1)
+        return qft
+    def qft_rotations(qft, n):
+        # Performs qft on the first n qubits in circuit (without swaps)
+        if n == 0:
+            return qft
+        n -= 1
+        qft.h(n)
+        for qubit in range(n):
+            qft.cu1(np.pi/2**(n-qubit), qubit, n)
+        qft_rotations(qft, n)
+    qft_rotations(qft, n)
+    swap_registers(qft, n)
+    return qft
+
+
+#=====================================================================================================================
+
+# https://qiskit.org/textbook/ch-algorithms/quantum-counting.html
+
+search = tape
+condition_fsm(qcirc, fsm, tape)
+# print()
+# disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
+
+qcirc.h(count)
+qcirc.barrier()
+
+# Create controlled Grover oracle circuit
+oracle = U_oracle(len(search)).to_gate()
+c_oracle = oracle.control()
+c_oracle.label = "cGO"
+
+# Create controlled Grover diffuser circuit
+diffuser = U_diffuser(sum(qnos[0:8])).to_gate()
+tgt_GD = fsm+tape
+tgt_GD.append(ancilla[1])
+# diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
+c_diffuser = diffuser.control()
+c_diffuser.label = "cGD"
+
+# Create inverse QFT circuit
+iqft = U_QFT(len(count)).to_gate().inverse()
+iqft.label = "iQFT"
+
+# Begin controlled Grover iterations
+iterations = 1
+for qb in count:
+    for i in range(iterations):
+        # print([qb] + search)
+        qcirc.append(c_oracle, [qb] + search)
+        qcirc.barrier()
+        # qcirc.append(c_diffuser, [qb] + tgt_GD)
+        # qcirc.barrier()
+        qcirc.append(c_diffuser, [qb] + list(range(0,sum(qnos[0:8]))))
+        qcirc.barrier()
+    iterations *= 2
+
+# Inverse QFT
+qcirc.append(iqft, count)
+
+# print()
+# disp_isv(qcirc, "Step: Search and count", all=False, precision=1e-4)
+
+# Measure counting qubits
+qcirc.measure(count, range(len(count)))
+
+emulator = Aer.get_backend('qasm_simulator')
+job = execute(qcirc, emulator, shots=2048 )
+hist = job.result().get_counts()
+measured_str = max(hist, key=hist.get)
+measured_int = int(measured_str,2)
+print("Register Output = %i" % measured_int)
+
+"""For Processing Output of Quantum Counting"""
+# Calculate Theta
+n = 4
+t = 4
+theta = (measured_int/(2**t))*pi*2
+print("Theta = %.5f" % theta)
+# Calculate No. of Solutions
+N = 2**n
+M = N * (sin(theta/2)**2)
+print("No. of Solutions = %.1f" % (N-M))
+
+print(hist)
 
 # print()
 # print(qcirc.draw())
 # print()
 # print(qcirc.qasm())
-print()
-disp_isv(qcirc, "Step: Test all", all=False, precision=1e-4)
 
-#=====================================================================================================================
-
-def U_count(reg, val):
-	if (len(reg) != len(val)):
-		print("Search length not same")
-	else:
-		print("Search in progress....")
 		
-#=====================================================================================================================
-
-U_count(fsm, val = '0000')
-
 #=====================================================================================================================
