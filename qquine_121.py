@@ -331,8 +331,8 @@ def condition_state(qcirc, state, target_state):
 search = tape
 condition_fsm(qcirc, fsm, tape)
 
-# print()
-# disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
+print()
+disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
 
 #=====================================================================================================================
 
@@ -388,11 +388,10 @@ c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
 # Create controlled Grover diffuser circuit
-# diffuser = U_diffuser(len(search)).to_gate()
 diffuser = U_diffuser(sum(qnos[0:8])).to_gate()
 # tgt_GD = fsm+tape
 # tgt_GD.append(ancilla[1])
-# # diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
+# diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
 
@@ -431,9 +430,9 @@ qcirc.measure(count, range(len(count)))
 #=====================================================================================================================
 
 emulator = Aer.get_backend('qasm_simulator')
-job = execute(qcirc, emulator, shots=1024)
+job = execute(qcirc, emulator, shots=128)
 hist = job.result().get_counts()
-print(hist)
+# print(hist)
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
