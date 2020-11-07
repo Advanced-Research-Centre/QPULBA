@@ -3,6 +3,7 @@ import random
 from qiskit import QuantumCircuit, Aer, execute
 from math import log2, ceil, pi, sin
 from numpy import savetxt, save, savez_compressed
+import sys
 
 #=====================================================================================================================
 
@@ -296,16 +297,48 @@ unit	= 'none'	# 'none', 'read', 'fsm', 'write', 'move', 'rst', 'count'
 qcirc_width = sum(qnos[0:9]) + len(test)
 qcirc = QuantumCircuit(qcirc_width, len(count))
 
-U_init(qcirc, qcirc_width, fsm)
-for tick in range(0, sim_tick):
-	U_read(qcirc, read, head, tape, ancilla)
-	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
-	U_write(qcirc, write, head, tape, ancilla)
-	U_move(qcirc, move, head, ancilla)
-	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
+# U_init(qcirc, qcirc_width, fsm)
+# for tick in range(0, sim_tick):
+# 	U_read(qcirc, read, head, tape, ancilla)
+# 	U_fsm(qcirc, tick, fsm, state, read, write, move, ancilla)
+# 	U_write(qcirc, write, head, tape, ancilla)
+# 	U_move(qcirc, move, head, ancilla)
+# 	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
+
+#	============ State Vector ============ Step: Run QPULBA 121
+#	(+0.25000+0.00000j)   |00000000000000000000>
+#	(+0.25000+0.00000j)   |00000000000000000100>
+#	(+0.25000+0.00000j)   |00000000000000001000>
+#	(+0.25000+0.00000j)   |00000000000000001100>
+#	(+0.25000+0.00000j)   |00000001111000000001>
+#	(+0.25000+0.00000j)   |00000001111000000101>
+#	(+0.25000+0.00000j)   |00000001111000001001>
+#	(+0.25000+0.00000j)   |00000001111000001101>
+#	(+0.25000+0.00000j)   |00000100000000000010>
+#	(+0.25000+0.00000j)   |00000100000000000110>
+#	(+0.25000+0.00000j)   |00000100000000001010>
+#	(+0.25000+0.00000j)   |00000100000000001110>
+#	(+0.25000+0.00000j)   |00000101111000000011>
+#	(+0.25000+0.00000j)   |00000101111000000111>
+#	(+0.25000+0.00000j)   |00000101111000001011>
+#	(+0.25000+0.00000j)   |00000101111000001111>
+#	============..............============
+
+def U_qpulba121(qcirc, fsm, tape, ancilla):
+	qcirc.h(fsm)
+	qcirc.cx(fsm[1], ancilla[1])
+	qcirc.cx(fsm[0],tape[0])
+	qcirc.cx(fsm[0],tape[1])
+	qcirc.cx(fsm[0],tape[2])
+	qcirc.cx(fsm[0],tape[3])
+	return
+
+U_qpulba121(qcirc, fsm, tape, ancilla)
 
 # print()
 # disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
+
+# sys.exit(0)
 
 #=====================================================================================================================
 
@@ -333,6 +366,8 @@ condition_fsm(qcirc, fsm, tape)
 
 print()
 disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
+
+# sys.exit(0)
 
 #=====================================================================================================================
 
@@ -388,10 +423,7 @@ c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
 # Create controlled Grover diffuser circuit
-diffuser = U_diffuser(sum(qnos[0:8])).to_gate()
-# tgt_GD = fsm+tape
-# tgt_GD.append(ancilla[1])
-# diffuser = U_diffuser(len(tgt_GD)).to_gate()	# lite version, do not diffuse qubits that can be uncomputed
+diffuser = U_diffuser(len(search)).to_gate()
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
 
@@ -407,12 +439,11 @@ qcirc.barrier()
 # Begin controlled Grover iterations
 iterations = 1
 for qb in count:
-    for i in range(iterations):
-        qcirc.append(c_oracle, [qb] + search)
-        # qcirc.append(c_diffuser, [qb] + tgt_GD)
-        qcirc.append(c_diffuser, [qb] + list(range(0,sum(qnos[0:8]))))
-    iterations *= 2
-    qcirc.barrier()
+	for i in range(iterations):
+		qcirc.append(c_oracle, [qb] + search)
+		qcirc.append(c_diffuser, [qb] + search)
+	iterations *= 2
+	qcirc.barrier()
 
 # Inverse QFT
 qcirc.append(iqft, count)
@@ -427,12 +458,14 @@ qcirc.measure(count, range(len(count)))
 # print()
 # print(qcirc.draw())
 
+# sys.exit(0)
+
 #=====================================================================================================================
 
 emulator = Aer.get_backend('qasm_simulator')
-job = execute(qcirc, emulator, shots=128)
+job = execute(qcirc, emulator, shots=2048)
 hist = job.result().get_counts()
-# print(hist)
+print(hist)
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2

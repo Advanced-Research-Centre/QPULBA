@@ -34,6 +34,22 @@ def U_oracle1(sz):
     oracle.x(tgt_reg)
     return oracle
 
+def U_oracle1(sz):
+	# Mark {0000, 1111}
+	tgt_reg = list(range(0,sz))
+	oracle = QuantumCircuit(len(tgt_reg))
+	# 0000
+	oracle.x(tgt_reg)
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x(tgt_reg)
+	# 1111
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	return oracle
+	
 def U_oracle5(sz):
     # Mark {0111, 1111, 1001, 1011, 0101}
     tgt_reg = list(range(0,sz))
