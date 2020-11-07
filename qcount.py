@@ -23,7 +23,7 @@ def disp_isv(circ, msg="", all=True, precision=1e-8):
 
 #=====================================================================================================================
 
-def U_oracle(sz):
+def U_oracle1(sz):
     # Mark fsm/tape/state with all zero Hamming distance (matches applied condition perfectly)
     tgt_reg = list(range(0,sz))
     oracle = QuantumCircuit(len(tgt_reg))
@@ -34,23 +34,23 @@ def U_oracle(sz):
     oracle.x(tgt_reg)
     return oracle
 
-# def U_oracle(sz):
-#     # Mark {0111, 1111, 1001, 1011, 0101}
-#     tgt_reg = list(range(0,sz))
-#     oracle = QuantumCircuit(len(tgt_reg))
-#     oracle.h([2,3])
-#     oracle.ccx(0,1,2)
-#     oracle.h(2)
-#     oracle.x(2)
-#     oracle.ccx(0,2,3)
-#     oracle.x(2)
-#     oracle.h(3)
-#     oracle.x([1,3])
-#     oracle.h(2)
-#     oracle.mct([0,1,3],2)
-#     oracle.x([1,3])
-#     oracle.h(2)
-#     return oracle
+def U_oracle5(sz):
+    # Mark {0111, 1111, 1001, 1011, 0101}
+    tgt_reg = list(range(0,sz))
+    oracle = QuantumCircuit(len(tgt_reg))
+    oracle.h([2,3])
+    oracle.ccx(0,1,2)
+    oracle.h(2)
+    oracle.x(2)
+    oracle.ccx(0,2,3)
+    oracle.x(2)
+    oracle.h(3)
+    oracle.x([1,3])
+    oracle.h(2)
+    oracle.mct([0,1,3],2)
+    oracle.x([1,3])
+    oracle.h(2)
+    return oracle
 
 #=====================================================================================================================
 
@@ -104,18 +104,19 @@ def U_QFT(n):
 
 #=====================================================================================================================
 
-qnos = [4, 4]
+qnos = [1, 4, 4]
 
-search	= list(range(sum(qnos[0:0]),sum(qnos[0:1])))
-count	= list(range(sum(qnos[0:1]),sum(qnos[0:2])))
+dummy	= list(range(sum(qnos[0:0]),sum(qnos[0:1])))
+search	= list(range(sum(qnos[0:1]),sum(qnos[0:2])))
+count	= list(range(sum(qnos[0:2]),sum(qnos[0:3])))
 
-qcirc_width = sum(qnos[0:2])
+qcirc_width = sum(qnos[0:3])
 qcirc = QuantumCircuit(qcirc_width, len(count))
 
 #=====================================================================================================================
 
 # Create controlled Grover oracle circuit
-oracle = U_oracle(len(search)).to_gate()
+oracle = U_oracle1(len(search)).to_gate()
 c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
@@ -130,8 +131,18 @@ iqft.label = "iQFT"
 
 #=====================================================================================================================
 
+# product state qubits not part of search qubits does not matter even if superposed
+# qcirc.i(dummy)
+# qcirc.x(dummy)
+# qcirc.h(dummy) 
+# qcirc.ry(0.25,dummy)
+
+# qcirc.ry(0.55,search) # probability  of states assumed to be equal in counting
 qcirc.h(search)
 qcirc.barrier()
+
+print()
+disp_isv(qcirc, "Step: Search state vector", all=False, precision=1e-4)
 
 qcirc.h(count)
 qcirc.barrier()
