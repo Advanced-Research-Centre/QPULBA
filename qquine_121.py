@@ -272,7 +272,16 @@ sim_tick = tsz                                  # Number of ticks of the FSM bef
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, dsz]
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, 4]
+
+searchbits = 9
+print("\nDetectable solutions with given count bits:")
+countbits = 14
+for i in range(0,countbits**2):
+    theta = (i/(2**countbits))*pi*2
+    counter = 2**searchbits * (1 - sin(theta/2)**2)
+    print(round(counter),"|",end='')
+sys.exit(0)
 
 fsm     = list(range(sum(qnos[0:0]),sum(qnos[0:1])))
 state   = list(range(sum(qnos[0:1]),sum(qnos[0:2])))  # States (Binary coded)
@@ -335,7 +344,6 @@ def U_qpulba121(qcirc, fsm, tape, ancilla):
 
 U_qpulba121(qcirc, fsm, tape, ancilla)
 
-# print()
 # disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
 
 # sys.exit(0)
@@ -364,7 +372,6 @@ def condition_state(qcirc, state, target_state):
 search = tape
 condition_fsm(qcirc, fsm, tape)
 
-print()
 disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
 
 # sys.exit(0)
@@ -423,7 +430,10 @@ c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
 # Create controlled Grover diffuser circuit
-diffuser = U_diffuser(len(search)).to_gate()
+# diffuser = U_diffuser(len(search)).to_gate()
+allregs = list(range(sum(qnos[0:0]),sum(qnos[0:8])))
+selregs = [0,1,2,3,9,10,11,12,14]	# fsm, tape, ancilla[1]
+diffuser = U_diffuser(len(selregs)).to_gate()
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
 
@@ -441,7 +451,7 @@ iterations = 1
 for qb in count:
 	for i in range(iterations):
 		qcirc.append(c_oracle, [qb] + search)
-		qcirc.append(c_diffuser, [qb] + search)
+		qcirc.append(c_diffuser, [qb] + selregs)
 	iterations *= 2
 	qcirc.barrier()
 
@@ -463,13 +473,15 @@ qcirc.measure(count, range(len(count)))
 #=====================================================================================================================
 
 emulator = Aer.get_backend('qasm_simulator')
-job = execute(qcirc, emulator, shots=2048)
+job = execute(qcirc, emulator, shots=128)
 hist = job.result().get_counts()
 print(hist)
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
 counter = 2**len(search) * (1 - sin(theta/2)**2)
+print("Number of solutions = %.1f" % counter)
+counter = 2**len(selregs) * (1 - sin(theta/2)**2)
 print("Number of solutions = %.1f" % counter)
 		
 #=====================================================================================================================
