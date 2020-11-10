@@ -23,6 +23,16 @@ def disp_isv(circ, msg="", all=True, precision=1e-8):
 
 #=====================================================================================================================
 
+def U_init(qcirc, dummy, search):
+    # product state qubits not part of search qubits does not matter even if superposed
+    # qcirc.i(dummy)
+    # qcirc.x(dummy)
+    qcirc.h(dummy) 
+    # qcirc.ry(0.25,dummy)
+    return
+
+#=====================================================================================================================
+
 def U_oracle1(sz):
     print("Oracle marks {0000}")
     tgt_reg = list(range(0,sz))
@@ -161,7 +171,8 @@ c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
 # Create controlled Grover diffuser circuit
-diffuser = U_diffuser(len(search)).to_gate()
+# diffuser = U_diffuser(len(search)).to_gate()
+diffuser = U_diffuser(len(dummy)+len(search)).to_gate()
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
 
@@ -171,28 +182,26 @@ iqft.label = "iQFT"
 
 #=====================================================================================================================
 
-# product state qubits not part of search qubits does not matter even if superposed
-# qcirc.i(dummy)
-# qcirc.x(dummy)
-# qcirc.h(dummy) 
-# qcirc.ry(0.25,dummy)
-
 # qcirc.ry(0.55,search) # probability  of states assumed to be equal in counting
 qcirc.h(search)
 qcirc.barrier()
 
-print()
-disp_isv(qcirc, "Step: Search state vector", all=False, precision=1e-4)
+U_init(qcirc, dummy, search)
+
+# print()
+# disp_isv(qcirc, "Step: Search state vector", all=False, precision=1e-4)
 
 qcirc.h(count)
 qcirc.barrier()
 
+viewMarking = 1
 # Begin controlled Grover iterations
 iterations = 1
 for qb in count:
     for i in range(iterations):
         qcirc.append(c_oracle, [qb] + search)
-        qcirc.append(c_diffuser, [qb] + search)
+        # qcirc.append(c_diffuser, [qb] + search)
+        qcirc.append(c_diffuser, [qb] + dummy + search)
     iterations *= 2
     qcirc.barrier()
 
@@ -211,12 +220,14 @@ qcirc.measure(count, range(len(count)))
 emulator = Aer.get_backend('qasm_simulator')
 job = execute(qcirc, emulator, shots=2048 )
 hist = job.result().get_counts()
-print(hist)
+# print(hist)
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
-counter = 2**len(search) * (1 - sin(theta/2)**2)
-print("Number of solutions = %.1f" % counter)
+# counter = 2**len(search) * (1 - sin(theta/2)**2)
+# print("Number of solutions = %d" % round(counter))
+counter = 2**(len(dummy)+len(search)) * (1 - sin(theta/2)**2)
+print("Number of solutions = %d" % round(counter))
 		
 #=====================================================================================================================
 
