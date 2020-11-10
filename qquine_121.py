@@ -272,16 +272,17 @@ sim_tick = tsz                                  # Number of ticks of the FSM bef
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, 4]
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, 6]
 
-searchbits = 9
-print("\nDetectable solutions with given count bits:")
-countbits = 14
-for i in range(0,countbits**2):
-    theta = (i/(2**countbits))*pi*2
-    counter = 2**searchbits * (1 - sin(theta/2)**2)
-    print(round(counter),"|",end='')
-sys.exit(0)
+# searchbits = 5
+# for j in range(1,8):
+# 	print("\nDetectable solutions with %d count bits:",j)
+# 	countbits = j
+# 	for i in range(0,countbits**2):
+# 		theta = (i/(2**countbits))*pi*2
+# 		counter = 2**searchbits * (1 - sin(theta/2)**2)
+# 		print(round(counter),"|",end='')
+# sys.exit(0)
 
 fsm     = list(range(sum(qnos[0:0]),sum(qnos[0:1])))
 state   = list(range(sum(qnos[0:1]),sum(qnos[0:2])))  # States (Binary coded)
@@ -432,7 +433,8 @@ c_oracle.label = "cGO"
 # Create controlled Grover diffuser circuit
 # diffuser = U_diffuser(len(search)).to_gate()
 allregs = list(range(sum(qnos[0:0]),sum(qnos[0:8])))
-selregs = [0,1,2,3,9,10,11,12,14]	# fsm, tape, ancilla[1]
+# selregs = [0,1,2,3,9,10,11,12,14]	# fsm, tape, ancilla[1]
+selregs = [0,9,10,11,12]	# fsm[0], tape
 diffuser = U_diffuser(len(selregs)).to_gate()
 c_diffuser = diffuser.control()
 c_diffuser.label = "cGD"
@@ -475,12 +477,10 @@ qcirc.measure(count, range(len(count)))
 emulator = Aer.get_backend('qasm_simulator')
 job = execute(qcirc, emulator, shots=128)
 hist = job.result().get_counts()
-print(hist)
+# print(hist)
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
-counter = 2**len(search) * (1 - sin(theta/2)**2)
-print("Number of solutions = %.1f" % counter)
 counter = 2**len(selregs) * (1 - sin(theta/2)**2)
 print("Number of solutions = %.1f" % counter)
 		
