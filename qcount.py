@@ -24,7 +24,7 @@ def disp_isv(circ, msg="", all=True, precision=1e-8):
 #=====================================================================================================================
 
 def U_oracle1(sz):
-    # Mark fsm/tape/state with all zero Hamming distance (matches applied condition perfectly)
+    print("Oracle marks {0000}")
     tgt_reg = list(range(0,sz))
     oracle = QuantumCircuit(len(tgt_reg))
     oracle.x(tgt_reg)
@@ -34,24 +34,48 @@ def U_oracle1(sz):
     oracle.x(tgt_reg)
     return oracle
 
-def U_oracle1(sz):
-	# Mark {0000, 1111}
-	tgt_reg = list(range(0,sz))
-	oracle = QuantumCircuit(len(tgt_reg))
-	# 0000
-	oracle.x(tgt_reg)
-	oracle.h(tgt_reg[0])
-	oracle.mct(tgt_reg[1:],tgt_reg[0])
-	oracle.h(tgt_reg[0])
-	oracle.x(tgt_reg)
-	# 1111
-	oracle.h(tgt_reg[0])
-	oracle.mct(tgt_reg[1:],tgt_reg[0])
-	oracle.h(tgt_reg[0])
-	return oracle
+def U_oracle2(sz):
+    print("Oracle marks {0000, 1111}")
+    tgt_reg = list(range(0,sz))
+    oracle = QuantumCircuit(len(tgt_reg))
+    # 0000
+    oracle.x(tgt_reg)
+    oracle.h(tgt_reg[0])
+    oracle.mct(tgt_reg[1:],tgt_reg[0])
+    oracle.h(tgt_reg[0])
+    oracle.x(tgt_reg)
+    # 1111
+    oracle.h(tgt_reg[0])
+    oracle.mct(tgt_reg[1:],tgt_reg[0])
+    oracle.h(tgt_reg[0])
+    return oracle
+
+def U_oracle3(sz):
+    print("Oracle marks {0000, 0101, 1111}")
+    tgt_reg = list(range(0,sz))
+    oracle = QuantumCircuit(len(tgt_reg))
+    # 0000
+    oracle.x(tgt_reg)
+    oracle.h(tgt_reg[0])
+    oracle.mct(tgt_reg[1:],tgt_reg[0])
+    oracle.h(tgt_reg[0])
+    oracle.x(tgt_reg)
+    # 0101
+    oracle.x(tgt_reg[1])
+    oracle.x(tgt_reg[3])
+    oracle.h(tgt_reg[0])
+    oracle.mct(tgt_reg[1:],tgt_reg[0])
+    oracle.h(tgt_reg[0])
+    oracle.x(tgt_reg[3])
+    oracle.x(tgt_reg[1])
+    # 1111
+    oracle.h(tgt_reg[0])
+    oracle.mct(tgt_reg[1:],tgt_reg[0])
+    oracle.h(tgt_reg[0])
+    return oracle
 	
 def U_oracle5(sz):
-    # Mark {0111, 1111, 1001, 1011, 0101}
+    print("Oracle marks {0111, 1111, 1001, 1011, 0101}")
     tgt_reg = list(range(0,sz))
     oracle = QuantumCircuit(len(tgt_reg))
     oracle.h([2,3])
@@ -120,7 +144,7 @@ def U_QFT(n):
 
 #=====================================================================================================================
 
-qnos = [1, 4, 4]
+qnos = [1, 4, 6]
 
 dummy	= list(range(sum(qnos[0:0]),sum(qnos[0:1])))
 search	= list(range(sum(qnos[0:1]),sum(qnos[0:2])))
@@ -132,7 +156,7 @@ qcirc = QuantumCircuit(qcirc_width, len(count))
 #=====================================================================================================================
 
 # Create controlled Grover oracle circuit
-oracle = U_oracle1(len(search)).to_gate()
+oracle = U_oracle3(len(search)).to_gate()
 c_oracle = oracle.control()
 c_oracle.label = "cGO"
 
@@ -193,5 +217,32 @@ measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
 counter = 2**len(search) * (1 - sin(theta/2)**2)
 print("Number of solutions = %.1f" % counter)
+		
+#=====================================================================================================================
+
+# RESULT: 6 count bits are required to detect all 16 possibilities while searching a 4 bit database
+
+# searchbits = 4
+
+# print("\nDetectable solutions with 4 count bits:")
+# countbits = 4
+# for i in range(0,countbits**2):
+#     theta = (i/(2**countbits))*pi*2
+#     counter = 2**searchbits * (1 - sin(theta/2)**2)
+#     print(round(counter),"|",end='')
+
+# print("\nDetectable solutions with 5 count bits:")
+# countbits = 5
+# for i in range(0,countbits**2):
+#     theta = (i/(2**countbits))*pi*2
+#     counter = 2**searchbits * (1 - sin(theta/2)**2)
+#     print(round(counter),"|",end='')
+
+# print("\nDetectable solutions with 6 count bits:")
+# countbits = 6
+# for i in range(0,countbits**2):
+#     theta = (i/(2**countbits))*pi*2
+#     counter = 2**searchbits * (1 - sin(theta/2)**2)
+#     print(round(counter),"|",end='')
 		
 #=====================================================================================================================
