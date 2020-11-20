@@ -272,7 +272,9 @@ sim_tick = tsz                                  # Number of ticks of the FSM bef
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, 6]
+countbits = 0
+
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, countbits]
 
 # searchbits = 5
 # for j in range(1,8):
@@ -305,7 +307,10 @@ test 	= []
 unit	= 'none'	# 'none', 'read', 'fsm', 'write', 'move', 'rst', 'count'
 
 qcirc_width = sum(qnos[0:9]) + len(test)
-qcirc = QuantumCircuit(qcirc_width, len(count))
+if (countbits != 0):
+	qcirc = QuantumCircuit(qcirc_width, len(count))
+else:
+	qcirc = QuantumCircuit(qcirc_width, len(tape))
 
 # U_init(qcirc, qcirc_width, fsm)
 # for tick in range(0, sim_tick):
@@ -316,22 +321,22 @@ qcirc = QuantumCircuit(qcirc_width, len(count))
 # 	U_rst(qcirc, tick, fsm, state, read, write, move, ancilla)
 
 #	============ State Vector ============ Step: Run QPULBA 121
-#	(+0.25000+0.00000j)   |00000000000000000000>
-#	(+0.25000+0.00000j)   |00000000000000000100>
-#	(+0.25000+0.00000j)   |00000000000000001000>
-#	(+0.25000+0.00000j)   |00000000000000001100>
-#	(+0.25000+0.00000j)   |00000001111000000001>
-#	(+0.25000+0.00000j)   |00000001111000000101>
-#	(+0.25000+0.00000j)   |00000001111000001001>
-#	(+0.25000+0.00000j)   |00000001111000001101>
-#	(+0.25000+0.00000j)   |00000100000000000010>
-#	(+0.25000+0.00000j)   |00000100000000000110>
-#	(+0.25000+0.00000j)   |00000100000000001010>
-#	(+0.25000+0.00000j)   |00000100000000001110>
-#	(+0.25000+0.00000j)   |00000101111000000011>
-#	(+0.25000+0.00000j)   |00000101111000000111>
-#	(+0.25000+0.00000j)   |00000101111000001011>
-#	(+0.25000+0.00000j)   |00000101111000001111>
+#	(+0.25000+0.00000j)   |0000000000000000>
+#	(+0.25000+0.00000j)   |0000000000000100>
+#	(+0.25000+0.00000j)   |0000000000001000>
+#	(+0.25000+0.00000j)   |0000000000001100>
+#	(+0.25000+0.00000j)   |0001111000000001>
+#	(+0.25000+0.00000j)   |0001111000000101>
+#	(+0.25000+0.00000j)   |0001111000001001>
+#	(+0.25000+0.00000j)   |0001111000001101>
+#	(+0.25000+0.00000j)   |0100000000000010>
+#	(+0.25000+0.00000j)   |0100000000000110>
+#	(+0.25000+0.00000j)   |0100000000001010>
+#	(+0.25000+0.00000j)   |0100000000001110>
+#	(+0.25000+0.00000j)   |0101111000000011>
+#	(+0.25000+0.00000j)   |0101111000000111>
+#	(+0.25000+0.00000j)   |0101111000001011>
+#	(+0.25000+0.00000j)   |0101111000001111>
 #	============..............============
 
 def U_qpulba121(qcirc, fsm, tape, ancilla):
@@ -341,13 +346,14 @@ def U_qpulba121(qcirc, fsm, tape, ancilla):
 	qcirc.cx(fsm[0],tape[1])
 	qcirc.cx(fsm[0],tape[2])
 	qcirc.cx(fsm[0],tape[3])
+	# qcirc.h(tape[1])
+	# qcirc.h(tape[2])
+	# qcirc.h(tape[3])
 	return
 
 U_qpulba121(qcirc, fsm, tape, ancilla)
 
-# disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
-
-# sys.exit(0)
+disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
 
 #=====================================================================================================================
 
@@ -390,98 +396,243 @@ def U_oracle(sz):
 	oracle.x(tgt_reg)
 	return oracle
 
+def U_pattern(sz):
+	# Mark {0000,0010,0100,0110,1000,1010,1100,1110}
+	tgt_reg = list(range(0,sz))
+	oracle = QuantumCircuit(len(tgt_reg))
+	oracle.x(tgt_reg)
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x(tgt_reg)
+	oracle.x([tgt_reg[0],tgt_reg[2],tgt_reg[3]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[2],tgt_reg[3]])
+	oracle.x([tgt_reg[0],tgt_reg[1],tgt_reg[3]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[1],tgt_reg[3]])
+	oracle.x([tgt_reg[0],tgt_reg[3]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[3]])
+	oracle.x([tgt_reg[0],tgt_reg[1],tgt_reg[2]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[1],tgt_reg[2]])
+	oracle.x([tgt_reg[0],tgt_reg[2]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[2]])
+	oracle.x([tgt_reg[0],tgt_reg[1]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0],tgt_reg[1]])
+	oracle.x([tgt_reg[0]])
+	oracle.h(tgt_reg[0])
+	oracle.mct(tgt_reg[1:],tgt_reg[0])
+	oracle.h(tgt_reg[0])
+	oracle.x([tgt_reg[0]])
+	return oracle
+
+def U_aa(sz):
+	tgt_reg = list(range(0,sz))
+	diffuser = QuantumCircuit(len(tgt_reg))
+	diffuser.h(tgt_reg)
+	diffuser.x(tgt_reg)
+	diffuser.h(tgt_reg[0])
+	diffuser.mct(tgt_reg[1:],tgt_reg[0])
+	diffuser.h(tgt_reg[0])
+	diffuser.x(tgt_reg)
+	diffuser.h(tgt_reg)
+	return diffuser
+
 def U_diffuser(sz):
-    # https://qiskit.org/textbook/ch-algorithms/quantum-counting.html
-    tgt_reg = list(range(0,sz))
-    diffuser = QuantumCircuit(len(tgt_reg))
-    diffuser.h(tgt_reg[1:])
-    diffuser.x(tgt_reg[1:])
-    diffuser.z(tgt_reg[0])
-    diffuser.mct(tgt_reg[1:],tgt_reg[0])
-    diffuser.x(tgt_reg[1:])
-    diffuser.h(tgt_reg[1:])
-    diffuser.z(tgt_reg[0])
-    return diffuser
+	# https://qiskit.org/textbook/ch-algorithms/quantum-counting.html
+	tgt_reg = list(range(0,sz))
+	diffuser = QuantumCircuit(len(tgt_reg))
+	diffuser.h(tgt_reg[1:])
+	diffuser.x(tgt_reg[1:])
+	diffuser.z(tgt_reg[0])
+	diffuser.mct(tgt_reg[1:],tgt_reg[0])
+	diffuser.x(tgt_reg[1:])
+	diffuser.h(tgt_reg[1:])
+	diffuser.z(tgt_reg[0])
+	return diffuser
 
 def U_QFT(n):
-    # n-qubit QFT circuit
-    qft = QuantumCircuit(n)
-    def swap_registers(qft, n):
-        for qubit in range(n//2):
-            qft.swap(qubit, n-qubit-1)
-        return qft
-    def qft_rotations(qft, n):
-        # Performs qft on the first n qubits in circuit (without swaps)
-        if n == 0:
-            return qft
-        n -= 1
-        qft.h(n)
-        for qubit in range(n):
-            qft.cu1(np.pi/2**(n-qubit), qubit, n)
-        qft_rotations(qft, n)
-    qft_rotations(qft, n)
-    swap_registers(qft, n)
-    return qft
+	# n-qubit QFT circuit
+	qft = QuantumCircuit(n)
+	def swap_registers(qft, n):
+		for qubit in range(n//2):
+			qft.swap(qubit, n-qubit-1)
+		return qft
+	def qft_rotations(qft, n):
+		# Performs qft on the first n qubits in circuit (without swaps)
+		if n == 0:
+			return qft
+		n -= 1
+		qft.h(n)
+		for qubit in range(n):
+			qft.cu1(np.pi/2**(n-qubit), qubit, n)
+		qft_rotations(qft, n)
+	qft_rotations(qft, n)
+	swap_registers(qft, n)
+	return qft
 
 #=====================================================================================================================
 
-# Create controlled Grover oracle circuit
-oracle = U_oracle(len(search)).to_gate()
-c_oracle = oracle.control()
-c_oracle.label = "cGO"
+oracle = U_oracle(len(tape)).to_gate()
+oracle.label = "GO"
 
-# Create controlled Grover diffuser circuit
-# diffuser = U_diffuser(len(search)).to_gate()
+pattern = U_pattern(len(tape)).to_gate()
+pattern.label = "PO"
+
 allregs = list(range(sum(qnos[0:0]),sum(qnos[0:8])))
-# selregs = [0,1,2,3,9,10,11,12,14]	# fsm, tape, ancilla[1]
-selregs = [0,9,10,11,12]	# fsm[0], tape
-diffuser = U_diffuser(len(selregs)).to_gate()
-c_diffuser = diffuser.control()
-c_diffuser.label = "cGD"
+aa = U_aa(len(tape)).to_gate()
+aa.label = "AA"
 
-# Create inverse QFT circuit
-iqft = U_QFT(len(count)).to_gate().inverse()
-iqft.label = "iQFT"
+from copy import deepcopy
+
+def count_constructors(qcirc, gi):
+
+	for i in range(gi):
+		qcirc.append(oracle, tape)
+		disp_isv(qcirc, "Step: Mark", all=False, precision=1e-4)
+		qcirc.append(aa, tape)
+		# disp_isv(qcirc, "Step: Amplify", all=False, precision=1e-4)
+
+	qcirc.measure(tape, range(len(tape)))
+		
+	emulator = Aer.get_backend('qasm_simulator')
+	job = execute(qcirc, emulator, shots=2048)
+	hist = job.result().get_counts()
+	print(hist)
+	return
+
+# def count_constructors(qcirc, gi):
+
+# 	qcirc.append(oracle, tape)
+# 	qcirc.append(aa, tape)
+# 	qcirc.append(pattern, tape)
+# 	qcirc.append(aa, tape)
+# 	for i in range(gi):
+# 		qcirc.append(oracle, tape)
+# 		disp_isv(qcirc, "Step: Mark", all=False, precision=1e-4)
+# 		qcirc.append(aa, tape)
+# 		# disp_isv(qcirc, "Step: Amplify", all=False, precision=1e-4)
+
+# 	qcirc.measure(tape, range(len(tape)))
+	
+# 	# print()
+# 	# print(qcirc.draw())
+		
+# 	emulator = Aer.get_backend('qasm_simulator')
+# 	job = execute(qcirc, emulator, shots=2048)
+# 	hist = job.result().get_counts()
+# 	print(hist)
+# 	return
+
+for i in range(0,3):
+	count_constructors(deepcopy(qcirc),i)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #=====================================================================================================================
+# Code below archived for now	
+#=====================================================================================================================
 
-qcirc.h(count)
-qcirc.barrier()
+def count_constructors():
 
-# Begin controlled Grover iterations
-iterations = 1
-for qb in count:
-	for i in range(iterations):
-		qcirc.append(c_oracle, [qb] + search)
-		qcirc.append(c_diffuser, [qb] + selregs)
-	iterations *= 2
+
+	#=====================================================================================================================
+
+	# Create controlled Grover oracle circuit
+	oracle = U_oracle(len(search)).to_gate()
+	c_oracle = oracle.control()
+	c_oracle.label = "cGO"
+
+	# Create controlled Grover diffuser circuit
+	# diffuser = U_diffuser(len(search)).to_gate()
+	allregs = list(range(sum(qnos[0:0]),sum(qnos[0:8])))
+	# selregs = [0,1,2,3,9,10,11,12,14]	# fsm, tape, ancilla[1]
+	selregs = [0,9,10,11,12]	# fsm[0], tape
+	diffuser = U_diffuser(len(selregs)).to_gate()
+	c_diffuser = diffuser.control()
+	c_diffuser.label = "cGD"
+
+	# Create inverse QFT circuit
+	iqft = U_QFT(len(count)).to_gate().inverse()
+	iqft.label = "iQFT"
+
+	#=====================================================================================================================
+
+	qcirc.h(count)
 	qcirc.barrier()
 
-# Inverse QFT
-qcirc.append(iqft, count)
-qcirc.barrier()
+	# Begin controlled Grover iterations
+	iterations = 1
+	for qb in count:
+		for i in range(iterations):
+			qcirc.append(c_oracle, [qb] + search)
+			qcirc.append(c_diffuser, [qb] + selregs)
+		iterations *= 2
+		qcirc.barrier()
 
-# print()
-# disp_isv(qcirc, "Step: Search and count", all=False, precision=1e-4)
+	# Inverse QFT
+	qcirc.append(iqft, count)
+	qcirc.barrier()
 
-# Measure counting qubits
-qcirc.measure(count, range(len(count)))
+	# print()
+	# disp_isv(qcirc, "Step: Search and count", all=False, precision=1e-4)
 
-# print()
-# print(qcirc.draw())
+	# Measure counting qubits
+	qcirc.measure(count, range(len(count)))
 
-# sys.exit(0)
+	# print()
+	# print(qcirc.draw())
 
-#=====================================================================================================================
+	# sys.exit(0)
 
-emulator = Aer.get_backend('qasm_simulator')
-job = execute(qcirc, emulator, shots=128)
-hist = job.result().get_counts()
-# print(hist)
+	#=====================================================================================================================
 
-measured_int = int(max(hist, key=hist.get),2)
-theta = (measured_int/(2**len(count)))*pi*2
-counter = 2**len(selregs) * (1 - sin(theta/2)**2)
-print("Number of solutions = %.1f" % counter)
-		
-#=====================================================================================================================
+	emulator = Aer.get_backend('qasm_simulator')
+	job = execute(qcirc, emulator, shots=128)
+	hist = job.result().get_counts()
+	# print(hist)
+
+	measured_int = int(max(hist, key=hist.get),2)
+	theta = (measured_int/(2**len(count)))*pi*2
+	counter = 2**len(selregs) * (1 - sin(theta/2)**2)
+	print("Number of solutions = %.1f" % counter)
+			
+	#=====================================================================================================================
