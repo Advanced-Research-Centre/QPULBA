@@ -25,22 +25,21 @@ def disp_isv(circ, msg="", all=True, precision=1e-8):
 
 #=====================================================================================================================
 
-fsm = [0,1,2,3]
-tape = [4,5,6,7]
-ancilla = [8]
-count = [9,10,11,12,13,14]
+tape = [0,1,2,3]
+ancilla = [4]
+count = [5,6,7,8]
 
-searchbits = 5
-for j in range(4,7):
-	print("\nDetectable solutions with %d count bits:",j)
-	countbits = j
-	for i in range(0,countbits**2):
-		theta = (i/(2**countbits))*pi*2
-		counter = 2**searchbits * (1 - sin(theta/2)**2)
-		print(round(counter),"|",end='')
+# searchbits = 5
+# for j in range(4,7):
+# 	print("\nDetectable solutions with %d count bits:",j)
+# 	countbits = j
+# 	for i in range(0,countbits**2):
+# 		theta = (i/(2**countbits))*pi*2
+# 		counter = 2**searchbits * (1 - sin(theta/2)**2)
+# 		print(round(counter),"|",end='')
 # sys.exit(0)
 
-qcirc_width = len(fsm) + len(tape) + len(ancilla) + len(count)
+qcirc_width = len(tape) + len(ancilla) + len(count)
 qcirc = QuantumCircuit(qcirc_width, len(count))
 
 # U_qpulba121
@@ -51,8 +50,10 @@ qcirc = QuantumCircuit(qcirc_width, len(count))
 # qcirc.cx(fsm[0],tape[2])
 # qcirc.cx(fsm[0],tape[3])
 
-qcirc.h(tape)
-qcirc.cx(tape[1], ancilla[0])   # Gives 32 solns: wrong
+# qcirc.h(tape)
+# qcirc.h(tape[0:3])
+qcirc.h(tape[0])
+# qcirc.cx(tape[1], ancilla[0])   # Gives 32 solns: wrong
 # qcirc.h(ancilla[0])   # Gives 2 solns: correct
 
 disp_isv(qcirc, "Step: Run QPULBA 121", all=False, precision=1e-4)
@@ -124,7 +125,7 @@ def U_QFT(n):
 
 #=====================================================================================================================
 
-selregs = [4,5,6,7,8]
+selregs = [0,1,2,3]
 # selregs = [4,5,6,7]
 # selregs = [0,1,2,3,4,5,6,7,8]
 
@@ -154,6 +155,7 @@ for qb in count:
 	for i in range(iterations):
 		# qcirc.append(c_oracle, [qb] + search)
 		qcirc.append(c_oracle, [qb] + selregs)
+		# disp_isv(qcirc, "Step", all=False, precision=1e-4)
 		qcirc.append(c_diffuser, [qb] + selregs)
 	iterations *= 2
 	qcirc.barrier()
@@ -177,8 +179,10 @@ hist = job.result().get_counts()
 
 measured_int = int(max(hist, key=hist.get),2)
 theta = (measured_int/(2**len(count)))*pi*2
-# counter = 2**4 * (1 - sin(theta/2)**2)
+# counter = 2**3 * (1 - sin(theta/2)**2)
 # print("Number of solutions = %.1f" % counter)
+counter = 2**len(selregs) * sin(theta/2)**2
+print("Number of non-solutions =",counter)
 counter = 2**len(selregs) * (1 - sin(theta/2)**2)
 print("Number of solutions = %.1f" % counter)
 		
