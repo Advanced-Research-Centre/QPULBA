@@ -272,19 +272,9 @@ sim_tick = tsz                                  # Number of ticks of the FSM bef
 tlog = (sim_tick+1) * senc                      # Transition log # required?
 nanc	= 3
 
-countbits = 0
+quinebit = 1
 
-qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, countbits]
-
-# searchbits = 5
-# for j in range(1,8):
-# 	print("\nDetectable solutions with %d count bits:",j)
-# 	countbits = j
-# 	for i in range(0,countbits**2):
-# 		theta = (i/(2**countbits))*pi*2
-# 		counter = 2**searchbits * (1 - sin(theta/2)**2)
-# 		print(round(counter),"|",end='')
-# sys.exit(0)
+qnos = [dsz, tlog, tdim, hsz, csz, csz, tsz, nanc, quinebit]
 
 fsm     = list(range(sum(qnos[0:0]),sum(qnos[0:1])))
 state   = list(range(sum(qnos[0:1]),sum(qnos[0:2])))  # States (Binary coded)
@@ -295,22 +285,17 @@ write   = list(range(sum(qnos[0:5]),sum(qnos[0:6])))  # Can be MUXed with read?
 tape    = list(range(sum(qnos[0:6]),sum(qnos[0:7])))
 ancilla = list(range(sum(qnos[0:7]),sum(qnos[0:8])))
 
-count	= list(range(sum(qnos[0:8]),sum(qnos[0:9])))
-# search	= list(range(sum(qnos[0:9]),sum(qnos[0:10])))
+quine	= list(range(sum(qnos[0:8]),sum(qnos[0:9])))
 
-print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla,"\nCOUNT\t:",count)
-
+print("\nFSM\t:",fsm,"\nSTATE\t:",state,"\nMOVE\t:",move,"\nHEAD\t:",head,"\nREAD\t:",read,"\nWRITE\t:",write,"\nTAPE\t:",tape,"\nANCILLA :",ancilla,"\nQUINE\t:",quine)
 
 #=====================================================================================================================
 
 test 	= []
-unit	= 'none'	# 'none', 'read', 'fsm', 'write', 'move', 'rst', 'count'
+unit	= 'none'	# 'none', 'read', 'fsm', 'write', 'move', 'rst'
 
 qcirc_width = sum(qnos[0:9]) + len(test)
-if (countbits != 0):
-	qcirc = QuantumCircuit(qcirc_width, len(count))
-else:
-	qcirc = QuantumCircuit(qcirc_width, len(tape))
+qcirc = QuantumCircuit(qcirc_width, len(quine))
 
 # U_init(qcirc, qcirc_width, fsm)
 # for tick in range(0, sim_tick):
@@ -346,9 +331,6 @@ def U_qpulba121(qcirc, fsm, tape, ancilla):
 	qcirc.cx(fsm[0],tape[1])
 	qcirc.cx(fsm[0],tape[2])
 	qcirc.cx(fsm[0],tape[3])
-	# qcirc.h(tape[1])
-	# qcirc.h(tape[2])
-	# qcirc.h(tape[3])
 	return
 
 U_qpulba121(qcirc, fsm, tape, ancilla)
@@ -376,15 +358,140 @@ def condition_state(qcirc, state, target_state):
 
 #=====================================================================================================================
 
-search = tape
 condition_fsm(qcirc, fsm, tape)
 
 disp_isv(qcirc, "Step: Find self-replicating programs", all=False, precision=1e-4)
 
-# sys.exit(0)
+#=====================================================================================================================
+
+def U_oracle(qcirc, tape, quine):
+	# Mark tape with all zero Hamming distance
+	qcirc.x(tape)
+	qcirc.mct(tape,quine)
+	qcirc.x(tape)
+	return
+
+U_oracle(qcirc, tape, quine)
+
+disp_isv(qcirc, "Step: Quine bit", all=False, precision=1e-4)
 
 #=====================================================================================================================
 
+qcirc.measure(quine, 0)
+
+disp_isv(qcirc, "Step: Post select quines", all=False, precision=1e-4)
+
+sys.exit(0)	
+	
+#=====================================================================================================================	
+	
+#		Number of 2-symbol 1-state 1-dimension Quantum Parallel Universal Linear Bounded Automata: 16
+#
+#		FSM     : [0, 1, 2, 3]
+#		STATE   : []
+#		MOVE    : [4]
+#		HEAD    : [5, 6]
+#		READ    : [7]
+#		WRITE   : [8]
+#		TAPE    : [9, 10, 11, 12]
+#		ANCILLA : [13, 14, 15]
+#		QUINE   : [16]
+#
+#		============ State Vector ============ Step: Run QPULBA 121
+#		  (+0.25000+0.00000j)   |00000000000000000>
+#		  (+0.25000+0.00000j)   |00000000000000100>
+#		  (+0.25000+0.00000j)   |00000000000001000>
+#		  (+0.25000+0.00000j)   |00000000000001100>
+#		  (+0.25000+0.00000j)   |00001111000000001>
+#		  (+0.25000+0.00000j)   |00001111000000101>
+#		  (+0.25000+0.00000j)   |00001111000001001>
+#		  (+0.25000+0.00000j)   |00001111000001101>
+#		  (+0.25000+0.00000j)   |00100000000000010>
+#		  (+0.25000+0.00000j)   |00100000000000110>
+#		  (+0.25000+0.00000j)   |00100000000001010>
+#		  (+0.25000+0.00000j)   |00100000000001110>
+#		  (+0.25000+0.00000j)   |00101111000000011>
+#		  (+0.25000+0.00000j)   |00101111000000111>
+#		  (+0.25000+0.00000j)   |00101111000001011>
+#		  (+0.25000+0.00000j)   |00101111000001111>
+#		============..............============
+#
+#		============ State Vector ============ Step: Find self-replicating programs
+#		  (+0.25000+0.00000j)   |00000000000000000>
+#		  (+0.25000+0.00000j)   |00000010000001101>
+#		  (+0.25000+0.00000j)   |00000100000000100>
+#		  (+0.25000+0.00000j)   |00000110000001001>
+#		  (+0.25000+0.00000j)   |00001000000001000>
+#		  (+0.25000+0.00000j)   |00001010000000101>
+#		  (+0.25000+0.00000j)   |00001100000001100>
+#		  (+0.25000+0.00000j)   |00001110000000001>
+#		  (+0.25000+0.00000j)   |00100000000001111>
+#		  (+0.25000+0.00000j)   |00100010000000010>
+#		  (+0.25000+0.00000j)   |00100100000001011>
+#		  (+0.25000+0.00000j)   |00100110000000110>
+#		  (+0.25000+0.00000j)   |00101000000000111>
+#		  (+0.25000+0.00000j)   |00101010000001010>
+#		  (+0.25000+0.00000j)   |00101100000000011>
+#		  (+0.25000+0.00000j)   |00101110000001110>
+#		============..............============
+#
+#		============ State Vector ============ Step: Quine bit
+#		  (+0.25000-0.00000j)   |00000010000001101>
+#		  (+0.25000-0.00000j)   |00000100000000100>
+#		  (+0.25000-0.00000j)   |00000110000001001>
+#		  (+0.25000-0.00000j)   |00001000000001000>
+#		  (+0.25000-0.00000j)   |00001010000000101>
+#		  (+0.25000-0.00000j)   |00001100000001100>
+#		  (+0.25000-0.00000j)   |00001110000000001>
+#		  (+0.25000-0.00000j)   |00100010000000010>
+#		  (+0.25000-0.00000j)   |00100100000001011>
+#		  (+0.25000-0.00000j)   |00100110000000110>
+#		  (+0.25000-0.00000j)   |00101000000000111>
+#		  (+0.25000-0.00000j)   |00101010000001010>
+#		  (+0.25000-0.00000j)   |00101100000000011>
+#		  (+0.25000-0.00000j)   |00101110000001110>
+#		  (+0.25000-0.00000j)   |10000000000000000>
+#		  (+0.25000-0.00000j)   |10100000000001111>
+#		============..............============
+#
+#		============ State Vector ============ Step: Post select quines
+#		  (+0.70711-0.00000j)   |10000000000000000>
+#		  (+0.70711-0.00000j)   |10100000000001111>
+#		============..............============	
+	
+#=====================================================================================================================
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+#=====================================================================================================================
+# Code below archived for now	
+#=====================================================================================================================	
+	
+	
+	
+#=====================================================================================================================	
+	
 def U_oracle(sz):
 	# Mark fsm/tape/state with all zero Hamming distance (matches applied condition perfectly)
 	tgt_reg = list(range(0,sz))
